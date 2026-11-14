@@ -51,6 +51,16 @@ WebKit 引擎测试也不等同于在 macOS/iOS Safari 真机验收。
 字体使用系统回退，系统之间仍可能有正常的字形差异。
 测试没有证明 Chrome 或 Firefox 在所有环境下都不能打开原站。
 
+## GitHub Pages 发布后的复核
+
+实验站已部署到 `https://victory200707.github.io/xixingshenzhou/`。
+原仓库 248 个文件在复制提交中逐个 Git blob 哈希一致，修复后也无原文件缺失。
+本地重新执行静态发布及天文计算测试，9 项通过。
+线上 Chromium 四种尺寸和 Firefox 1440、900 宽度检查通过。
+Firefox 390 宽度等待着色超时，WebKit 桌面截图等待字体超时；
+原因尚未确定，因此线上跨浏览器验收仍未全部通过，不能将本地结果等同于线上全面验收。
+发布流程已将 Pages 上传和部署组件一起升级为 v5，最新部署成功。
+
 本地启动：`npm start`，然后访问 `http://127.0.0.1:8766/`。
 发布检查：`npm run test:release`。
 如需重新生成显示蒙版，安装 Playwright 并执行 `node tools/generate-browser-mask.mjs`；
