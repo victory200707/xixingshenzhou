@@ -1,0 +1,27 @@
+name: Copy original project once
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: experiment
+      - uses: actions/checkout@v4
+        with:
+          repository: victory200707/xixing-shenzhou-map
+          ref: 5360ccbad342d9775157cd372a6356218da84aea
+          path: original
+          persist-credentials: false
+      - name: Copy every original tracked file
+        shell: bash
+        run: |
+          git -C original archive HEAD | tar -x -C experiment
+          git -C original ls-files -z | git -C experiment --literal-pathspecs add -f --pathspec-from-file=- --pathspec-file-nul
+          git -C experiment config user.name github-actions[bot]
+          git -C experiment config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C experiment commit -m "Copy all original files from xixing-shenzhou-map@5360ccb"
+          git -C experiment push origin HEAD:main
