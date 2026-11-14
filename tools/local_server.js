@@ -1,6 +1,6 @@
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 
 const root = process.cwd();
 const types = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg" };
@@ -8,7 +8,7 @@ const types = { ".html": "text/html", ".css": "text/css", ".js": "text/javascrip
 http.createServer((request, response) => {
   const relative = decodeURIComponent(request.url.split("?")[0] || "/");
   const file = path.resolve(root, relative === "/" ? "index.html" : `.${relative}`);
-  if (!file.startsWith(root)) { response.statusCode = 403; response.end("Forbidden"); return; }
+  if (!file.startsWith(root + path.sep)) { response.statusCode = 403; response.end("Forbidden"); return; }
   fs.readFile(file, (error, data) => {
     if (error) { response.statusCode = 404; response.end("Not found"); return; }
     response.setHeader("Content-Type", types[path.extname(file).toLowerCase()] || "application/octet-stream");

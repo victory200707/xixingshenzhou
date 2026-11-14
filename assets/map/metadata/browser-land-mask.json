@@ -1,0 +1,14 @@
+{
+  "purpose": "Display-only raster cache of existing linework fill; not a geographic source or new map geometry.",
+  "source": "assets/map/svg/presentation-coastline.svg",
+  "sourceSha256": "4b883762e392b8cd07494c56c7cb8d152fd4514769c89c7c772517cf4249224b",
+  "algorithm": "Existing createLineworkFillMask at source@5360ccb; same 0.125 scale, morphology and component selection.",
+  "algorithmSha256": "d6a3430d99ca32d95816e56ee0da1a9433e977715e7adb1666955fe1a4ed8dea",
+  "generator": "tools/generate-browser-mask.mjs",
+  "generatedOn": "2026-11-14",
+  "engine": "151.0.7922.34",
+  "width": 378,
+  "height": 267,
+  "output": "assets/map/raster/browser-land-mask.png",
+  "outputSha256": "149669a5859bc0693c9ed72fd3fe13761cd7b9619a1db979102e522d945fcca8"
+}

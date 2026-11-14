@@ -34,6 +34,12 @@ let officialBodyImage = null;
 let officialBodyLoading = false;
 let officialBodyMaskCache = null;
 let lineworkFillMaskCache = null;
+const solarDates = new WeakMap();
+
+function currentFrame(canvas, frame) {
+  const parent = canvas.parentElement;
+  return { ...frame, width: parent.clientWidth, height: parent.clientHeight };
+}
 
 function loadLandMask(canvas, imageRect, date, onReady = () => renderSolarField(canvas, imageRect, date)) {
   if (landMaskImage) return;
@@ -250,6 +256,8 @@ function loadTerrainNormal(canvas, imageRect, date, onReady = () => renderSolarF
 function loadOfficialBodyImage(canvas, imageRect, date) {
   if (officialBodyImage || officialBodyLoading) return;
   officialBodyLoading = true;
+  // Load the cached result of the existing linework-fill algorithm. Raster
+  // decoding is consistent across engines; SVG fill/flood-fill was not.
   // Load the checked-in, standalone mask directly. The previous implementation
   // fetched a large SVG, parsed it with DOMParser, rebuilt it as a Blob URL and
   // then rasterized that Blob. Blob SVG images are blocked or fail silently in
@@ -263,11 +271,11 @@ function loadOfficialBodyImage(canvas, imageRect, date) {
     officialBodyMaskCache = null;
     requestAnimationFrame(() => {
       renderTerrainRelief(document.querySelector('#terrainVisualLayer'), imageRect);
-      renderSolarField(canvas, imageRect, date);
+      renderSolarField(canvas, imageRect);
     });
   };
   image.onerror = () => { officialBodyLoading = false; };
-  image.src = 'assets/map/svg/approx-land-mask-source.svg?v=phase1c51-mask';
+  image.src = 'assets/map/raster/browser-land-mask.png?v=browser-fix-1';
 }
 
 function createOfficialBodyMask(imageRect, scale, ox, oy) {
@@ -295,6 +303,21 @@ function createOfficialBodyMask(imageRect, scale, ox, oy) {
   canvas.height = height;
   canvas.getContext('2d').putImageData(image, 0, 0);
   officialBodyMaskCache = { key, canvas, coverage };
+  return canvas;
+}
+
+// Every consumer receives a mask in the display frame, including when the
+// explicit SVG fill fails validation. A loaded image is not proof that its
+// fill was accepted; the fallback is still in source coordinates.
+function createDisplayBodyMask(imageRect, scale, ox, oy) {
+  const official = createOfficialBodyMask(imageRect, scale, ox, oy);
+  if (official) return official;
+  const fallback = landMaskImage && createLineworkFillMask(landMaskImage);
+  if (!fallback) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.ceil(imageRect.width));
+  canvas.height = Math.max(1, Math.ceil(imageRect.height));
+  canvas.getContext('2d').drawImage(fallback, ox, oy, VIEWBOX.width * scale, VIEWBOX.height * scale);
   return canvas;
 }
 
@@ -514,11 +537,11 @@ function drawMaskedTerminators(ctx, mapper, date, imageRect, landMask, taiwanMas
 // texture and the solar field intentionally share the same V-space frame and
 // visual-only land mask, while the unchanged official SVG remains above both.
 export function renderTerrainRelief(canvas, imageRect) {
+  if (canvas) imageRect = currentFrame(canvas, imageRect);
   if (!canvas || !imageRect.width || !imageRect.height) return;
-  const parent = canvas.parentElement.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-  canvas.style.left = `${imageRect.left - parent.left}px`;
-  canvas.style.top = `${imageRect.top - parent.top}px`;
+  canvas.style.left = '0px';
+  canvas.style.top = '0px';
   canvas.style.width = `${imageRect.width}px`;
   canvas.style.height = `${imageRect.height}px`;
   canvas.width = Math.max(1, Math.round(imageRect.width * dpr));
@@ -539,7 +562,7 @@ export function renderTerrainRelief(canvas, imageRect) {
   const scale = boxRatio > sourceRatio ? imageRect.height / VIEWBOX.height : imageRect.width / VIEWBOX.width;
   const ox = (imageRect.width - VIEWBOX.width * scale) / 2;
   const oy = (imageRect.height - VIEWBOX.height * scale) / 2;
-  const bodyMaskImage = createOfficialBodyMask(imageRect, scale, ox, oy) || (landMaskImage && createLineworkFillMask(landMaskImage));
+  const bodyMaskImage = createDisplayBodyMask(imageRect, scale, ox, oy);
   if (!bodyMaskImage) return;
 
   const width = Math.max(1, Math.ceil(imageRect.width));
@@ -617,8 +640,7 @@ export function renderTerrainRelief(canvas, imageRect) {
     const maskCtx = mask.getContext('2d');
     maskCtx.imageSmoothingEnabled = true;
     maskCtx.filter = 'blur(0.55px)';
-    if (officialBodyImage) maskCtx.drawImage(bodyMaskImage, 0, 0, width, height);
-    else maskCtx.drawImage(bodyMaskImage, ox, oy, VIEWBOX.width * scale, VIEWBOX.height * scale);
+    maskCtx.drawImage(bodyMaskImage, 0, 0, width, height);
     maskCtx.filter = 'none';
     textureCtx.globalCompositeOperation = 'destination-in';
     textureCtx.drawImage(mask, 0, 0);
@@ -633,12 +655,14 @@ export function renderTerrainRelief(canvas, imageRect) {
   ctx.restore();
 }
 
-export function renderSolarField(canvas, imageRect, date = new Date('2026-06-20T21:00:00Z')) {
+export function renderSolarField(canvas, imageRect, date) {
+  if (canvas) imageRect = currentFrame(canvas, imageRect);
   if (!canvas || !imageRect.width || !imageRect.height) return;
-  const parent = canvas.parentElement.getBoundingClientRect();
+  date = date ?? solarDates.get(canvas) ?? new Date('2026-06-20T21:00:00Z');
+  solarDates.set(canvas, date);
   const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-  canvas.style.left = `${imageRect.left - parent.left}px`;
-  canvas.style.top = `${imageRect.top - parent.top}px`;
+  canvas.style.left = '0px';
+  canvas.style.top = '0px';
   canvas.style.width = `${imageRect.width}px`;
   canvas.style.height = `${imageRect.height}px`;
   canvas.width = Math.max(1, Math.round(imageRect.width * dpr));
@@ -676,7 +700,7 @@ export function renderSolarField(canvas, imageRect, date = new Date('2026-06-20T
   const ox = (imageRect.width - VIEWBOX.width * scale) / 2;
   const oy = (imageRect.height - VIEWBOX.height * scale) / 2;
   if (!landMaskImage && !officialBodyImage) return;
-  const bodyMaskImage = createOfficialBodyMask(imageRect, scale, ox, oy) || (landMaskImage && createLineworkFillMask(landMaskImage));
+  const bodyMaskImage = createDisplayBodyMask(imageRect, scale, ox, oy);
   if (!bodyMaskImage) return;
   let terrainPixels = null;
   // The official body fill is opaque, so the dynamic field must carry the
@@ -776,8 +800,7 @@ export function renderSolarField(canvas, imageRect, date = new Date('2026-06-20T
   const mctx = mask.getContext('2d');
   mctx.clearRect(0, 0, sw, sh);
   const drawMask = (image) => {
-    if (officialBodyImage) mctx.drawImage(image, 0, 0, sw, sh);
-    else mctx.drawImage(image, ox * sampleScale, oy * sampleScale, VIEWBOX.width * scale * sampleScale, VIEWBOX.height * scale * sampleScale);
+    mctx.drawImage(image, 0, 0, sw, sh);
   };
   drawMask(bodyMaskImage);
   const solarLayer = document.createElement('canvas');
@@ -808,13 +831,7 @@ export function renderSolarField(canvas, imageRect, date = new Date('2026-06-20T
   finalMaskCtx.imageSmoothingEnabled = true;
   finalMaskCtx.filter = 'blur(0.35px)';
   const drawFinalMask = (image) => {
-    const w = VIEWBOX.width * scale;
-    const h = VIEWBOX.height * scale;
-    // Keep this closure deliberately tiny: it is a display-layer tolerance,
-    // not a replacement for official coastline geometry.
-    const r = 1.4;
-    if (officialBodyImage) finalMaskCtx.drawImage(image, 0, 0, solarLayer.width, solarLayer.height);
-    else for (const [dx, dy] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) finalMaskCtx.drawImage(image, ox + dx, oy + dy, w, h);
+    finalMaskCtx.drawImage(image, 0, 0, solarLayer.width, solarLayer.height);
   };
   // Do not use the open-contour path3 candidate here. It is retained only for
   // audit documentation; the working visual mask is the validated raster
@@ -851,7 +868,7 @@ export function renderSolarField(canvas, imageRect, date = new Date('2026-06-20T
   ctx.drawImage(bloomBlur, 0, 0, imageRect.width, imageRect.height);
   ctx.restore();
   ctx.drawImage(solarLayer, 0, 0, imageRect.width, imageRect.height);
-  drawMaskedTerminators(ctx, mapper, date, imageRect, bodyMaskImage, null, dpr, scale, ox, oy, null);
+  drawMaskedTerminators(ctx, mapper, date, imageRect, bodyMaskImage, null, dpr, scale, ox, oy, bodyMaskImage);
 
 }
 
