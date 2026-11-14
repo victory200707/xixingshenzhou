@@ -1,0 +1,10 @@
+{
+  "name": "Copernicus DEM GLO-30",
+  "publisher": "European Space Agency / Copernicus",
+  "version": "",
+  "downloadUrl": "https://dataspace.copernicus.eu/",
+  "license": "",
+  "downloadDate": "",
+  "status": "NOT_USED_FOR_CURRENT_PREVIEW",
+  "notes": "Copernicus entry retained as a future formal source candidate. The current DEM preview was generated from public AWS elevation-tiles-prod Terrarium tiles; see assets/map/metadata/dem-hillshade-v.json. Do not treat this entry URL as the current file source."
+}
